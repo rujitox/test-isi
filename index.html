@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Practicar Test</title>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #0f172a;
+      color: white;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: auto;
+      padding: 30px;
+    }
+
+    h1 {
+      font-size: 42px;
+      margin-bottom: 5px;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 20px;
+      margin-top: 25px;
+    }
+
+    .card {
+      background: #111827;
+      border: 1px solid #374151;
+      border-radius: 18px;
+      padding: 20px;
+    }
+
+    select, button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
+      border-radius: 10px;
+      border: none;
+      font-size: 16px;
+    }
+
+    select {
+      background: #020617;
+      color: white;
+      border: 1px solid #374151;
+    }
+
+    button {
+      background: #7c3aed;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #6d28d9;
+    }
+
+    .secondary {
+      background: #374151;
+    }
+
+    .danger {
+      background: #991b1b;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .stat {
+      background: #020617;
+      border: 1px solid #374151;
+      padding: 15px;
+      border-radius: 14px;
+      text-align: center;
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 28px;
+    }
+
+    .question {
+      font-size: 26px;
+      margin-bottom: 20px;
+    }
+
+    .answer {
+      display: block;
+      background: #020617;
+      border: 1px solid #374151;
+      color: white;
+      padding: 15px;
+      border-radius: 12px;
+      margin-bottom: 10px;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .answer.selected {
+      border-color: #7c3aed;
+    }
+
+    .answer.correct {
+      background: #14532d;
+      border-color: #22c55e;
+    }
+
+    .answer.wrong {
+      background: #7f1d1d;
+      border-color: #ef4444;
+    }
+
+    .explanation {
+      display: none;
+      margin-top: 15px;
+      background: #422006;
+      border: 1px solid #f59e0b;
+      color: #fde68a;
+      padding: 15px;
+      border-radius: 12px;
+    }
+
+    .explanation.visible {
+      display: block;
+    }
+
+    .navigation {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    @media (max-width: 800px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .stats {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>Practicar Test</h1>
+    <p>Preguntas cargadas desde el archivo <b>preguntas.js</b></p>
+
+    <div class="layout">
+      <div class="card">
+        <h2>Configuración</h2>
+
+        <label>Tema</label>
+        <select id="subjectSelect"></select>
+
+        <label>Modo</label>
+        <select id="modeSelect">
+          <option value="instant">Corregir al responder</option>
+          <option value="exam">Modo examen</option>
+        </select>
+
+        <button onclick="startQuiz()">Empezar</button>
+        <button class="secondary" onclick="shuffleQuestions()">Aleatorio</button>
+        <button class="secondary" onclick="reviewQuiz()">Revisar</button>
+        <button class="danger" onclick="resetProgress()">Reiniciar</button>
+      </div>
+
+      <div class="card">
+        <div class="stats">
+          <div class="stat">
+            <strong id="correctCount">0</strong>
+            <span>Aciertos</span>
+          </div>
+          <div class="stat">
+            <strong id="wrongCount">0</strong>
+            <span>Fallos</span>
+          </div>
+          <div class="stat">
+            <strong id="scorePercent">0%</strong>
+            <span>Nota</span>
+          </div>
+        </div>
+
+        <div id="questionArea">
+          <p id="progressText">Pregunta 0/0</p>
+          <h2 class="question" id="questionText">Cargando preguntas...</h2>
+
+          <div id="answers"></div>
+
+          <div class="explanation" id="explanation"></div>
+
+          <div class="navigation">
+            <button class="secondary" onclick="prevQuestion()">Anterior</button>
+            <button onclick="nextQuestion()">Siguiente</button>
+          </div>
+
+          <button style="margin-top: 10px;" onclick="finishQuiz()">Finalizar</button>
+        </div>
+
+        <div id="resultArea" class="hidden">
+          <h2>Resultado final</h2>
+          <p id="finalText"></p>
+          <button onclick="startQuiz()">Repetir test</button>
+          <button class="secondary" onclick="reviewQuiz()">Revisar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="preguntas.js"></script>
+
+  <script>
+    let tests = typeof PREGUNTAS_TEST !== "undefined" ? PREGUNTAS_TEST : {};
+    let currentQuestions = [];
+    let currentIndex = 0;
+    let userAnswers = [];
+    let corrected = [];
+    let examMode = false;
+
+    const subjectSelect = document.getElementById("subjectSelect");
+    const modeSelect = document.getElementById("modeSelect");
+    const questionText = document.getElementById("questionText");
+    const answersDiv = document.getElementById("answers");
+    const explanationDiv = document.getElementById("explanation");
+    const progressText = document.getElementById("progressText");
+    const correctCount = document.getElementById("correctCount");
+    const wrongCount = document.getElementById("wrongCount");
+    const scorePercent = document.getElementById("scorePercent");
+    const resultArea = document.getElementById("resultArea");
+    const questionArea = document.getElementById("questionArea");
+    const finalText = document.getElementById("finalText");
+
+    function fillSubjects() {
+      subjectSelect.innerHTML = "";
+
+      const subjects = Object.keys(tests);
+
+      if (subjects.length === 0) {
+        const option = document.createElement("option");
+        option.textContent = "No hay preguntas cargadas";
+        subjectSelect.appendChild(option);
+        questionText.textContent = "No se ha encontrado el archivo preguntas.js o está mal escrito.";
+        return;
+      }
+
+      subjects.forEach(subject => {
+        const option = document.createElement("option");
+        option.value = subject;
+        option.textContent = subject;
+        subjectSelect.appendChild(option);
+      });
+    }
+
+    function startQuiz() {
+      const subject = subjectSelect.value;
+
+      if (!tests[subject] || tests[subject].length === 0) {
+        questionText.textContent = "No hay preguntas en este tema.";
+        answersDiv.innerHTML = "";
+        return;
+      }
+
+      currentQuestions = [...tests[subject]];
+      currentIndex = 0;
+      userAnswers = new Array(currentQuestions.length).fill(null);
+      corrected = new Array(currentQuestions.length).fill(false);
+      examMode = modeSelect.value === "exam";
+
+      resultArea.classList.add("hidden");
+      questionArea.classList.remove("hidden");
+
+      renderQuestion();
+      updateStats();
+    }
+
+    function shuffleQuestions() {
+      const subject = subjectSelect.value;
+      if (!tests[subject]) return;
+
+      currentQuestions = [...tests[subject]].sort(() => Math.random() - 0.5);
+      currentIndex = 0;
+      userAnswers = new Array(currentQuestions.length).fill(null);
+      corrected = new Array(currentQuestions.length).fill(false);
+      examMode = modeSelect.value === "exam";
+
+      renderQuestion();
+      updateStats();
+    }
+
+    function renderQuestion() {
+      const q = currentQuestions[currentIndex];
+
+      if (!q) {
+        questionText.textContent = "No hay pregunta disponible.";
+        return;
+      }
+
+      questionText.textContent = q.question;
+      progressText.textContent = `Pregunta ${currentIndex + 1}/${currentQuestions.length}`;
+      answersDiv.innerHTML = "";
+
+      explanationDiv.textContent = q.explanation || "";
+      explanationDiv.classList.remove("visible");
+
+      q.answers.forEach((answer, index) => {
+        const btn = document.createElement("button");
+        btn.className = "answer";
+        btn.textContent = `${String.fromCharCode(97 + index)}) ${answer}`;
+        btn.onclick = () => selectAnswer(index);
+
+        if (userAnswers[currentIndex] === index) {
+          btn.classList.add("selected");
+        }
+
+        if (corrected[currentIndex]) {
+          if (index === q.correct) btn.classList.add("correct");
+          if (userAnswers[currentIndex] === index && index !== q.correct) {
+            btn.classList.add("wrong");
+          }
+          explanationDiv.classList.add("visible");
+        }
+
+        answersDiv.appendChild(btn);
+      });
+    }
+
+    function selectAnswer(index) {
+      userAnswers[currentIndex] = index;
+
+      if (!examMode) {
+        corrected[currentIndex] = true;
+      }
+
+      renderQuestion();
+      updateStats();
+    }
+
+    function nextQuestion() {
+      if (currentIndex < currentQuestions.length - 1) {
+        currentIndex++;
+        renderQuestion();
+      } else {
+        finishQuiz();
+      }
+    }
+
+    function prevQuestion() {
+      if (currentIndex > 0) {
+        currentIndex--;
+        renderQuestion();
+      }
+    }
+
+    function finishQuiz() {
+      corrected = corrected.map(() => true);
+      updateStats();
+
+      questionArea.classList.add("hidden");
+      resultArea.classList.remove("hidden");
+
+      const correct = getCorrectAnswers();
+      const total = currentQuestions.length;
+      const wrong = userAnswers.filter((answer, i) => answer !== null && answer !== currentQuestions[i].correct).length;
+      const unanswered = userAnswers.filter(answer => answer === null).length;
+      const percent = total ? Math.round((correct / total) * 100) : 0;
+
+      finalText.innerHTML = `
+        Has acertado <b>${correct}</b> de <b>${total}</b> preguntas.<br>
+        Fallos: <b>${wrong}</b>.<br>
+        Sin contestar: <b>${unanswered}</b>.<br>
+        Nota aproximada: <b>${percent}%</b>.
+      `;
+    }
+
+    function reviewQuiz() {
+      if (!currentQuestions.length) return;
+
+      corrected = corrected.map(() => true);
+      resultArea.classList.add("hidden");
+      questionArea.classList.remove("hidden");
+      currentIndex = 0;
+      renderQuestion();
+    }
+
+    function resetProgress() {
+      userAnswers = new Array(currentQuestions.length).fill(null);
+      corrected = new Array(currentQuestions.length).fill(false);
+      currentIndex = 0;
+      renderQuestion();
+      updateStats();
+    }
+
+    function getCorrectAnswers() {
+      return userAnswers.filter((answer, i) => answer === currentQuestions[i].correct).length;
+    }
+
+    function updateStats() {
+      const correct = getCorrectAnswers();
+      const wrong = userAnswers.filter((answer, i) => answer !== null && currentQuestions[i] && answer !== currentQuestions[i].correct).length;
+      const total = currentQuestions.length || 1;
+      const percent = Math.round((correct / total) * 100);
+
+      correctCount.textContent = correct;
+      wrongCount.textContent = wrong;
+      scorePercent.textContent = `${percent}%`;
+    }
+
+    fillSubjects();
+    startQuiz();
+  </script>
+</body>
+</html>
